@@ -1,4 +1,10 @@
 #include <DHT.h>
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include <EEPROM.h>
+#include <SPI.h>                         // Include the SPI library
 
 #define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
@@ -13,9 +19,8 @@ DHT dht3(DHTPin3, DHTTYPE);
 static float t1_mean=0,h1_mean=0,t2_mean=0,h2_mean=0,t3_mean=0,h3_mean=0;
 static int t1_number=0,h1_number=0,t2_number=0,h2_number=0,t3_number=0,h3_number=0;
 static byte STATUS_bits=0,MeasureOK=0;
-#include <ESP8266WiFi.h>
-#include <EEPROM.h>
-#include <SPI.h>                         // Include the SPI library
+
+
 
 // MAC address from Ethernet shield sticker under board
 //byte mac[] = { 0xDE, 0xAD, 0xBE, 0x41, 0x42, 0x21 }; // make sure you change these values so that no MAC collision exist in your network
@@ -29,9 +34,9 @@ float T1,T2,T3;
 float H1,H2,H3;
 float DewPoint_centdeg;
 
+MDNSResponder mdns;
+ESP8266WebServer server(80);
 
-WiFiServer server(80);  // create a server at port 80
-WiFiClient client;
 static uint8_t baseREQ=0,orderREQ=0,webREQ=0; 
 
 struct XML_TAGS_BYTE // size 16 bytes
@@ -200,10 +205,6 @@ void setup()
     
     Serial.println("");
     Serial.println("WiFi connected");
-     
-    // Start the server
-    server.begin();
-    Serial.println("Server started");
    
     // Print the IP address
     Serial.print("Use this URL to connect: ");
@@ -213,7 +214,70 @@ void setup()
     
     Serial.print("MAC: ");
     Serial.println(WiFi.macAddress());
+    
+    if (mdns.begin("esp8266", WiFi.localIP())) {
+        Serial.println("MDNS responder started");
+    }
+    
+    server.on("/orders/SetConf", [](){
+        if (server.arg("DEVC")!= "")  
+        {
+          DeviceCode = server.arg("DEVC").toInt();              //Get the value of the parameter
+          EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
+          EEPROM.write(_EEPROMaddrIP_B1_,10);
+          EEPROM.write(_EEPROMaddrIP_B2_,10);
+          EEPROM.write(_EEPROMaddrIP_B3_,10);
+          EEPROM.write(_EEPROMaddrDEVICECODE_,DeviceCode);
+          EEPROM.end();
+          Serial.print("DeviceCode to be set at ");
+          Serial.println(DeviceCode);
+              
+          server.send(200, "text/html", "");
+        }else
+        {
+          server.send(200, "text/html", "");
+        }        
+         
+        delay(200);
+    });
+    
+    server.on("/orders/resetStatics", [](){
+        server.send(200, "text/html", "");
+        initialize_statics();
+    });
+  
+    server.on("/Conf.xml", [](){
+        String response = XML_response(&DeviceCode,__SIZE_XML_RESPONSE_Conf__,pXML_RESP_Conf); // sends the status of all switches
+        server.send(200, "text/xml", response);
+    });
+    
+    server.on("/data.xml", [](){
+        byte var[25];  
+        var[0]=STATUS_bits;
+        for (byte i=0;i<4;i++)
+        {
+         
+            var[i+1]=*((byte*)&t1_mean+3-i);
 
+            var[i+5]=*((byte*)&h1_mean+3-i);
+
+            var[i+9]=*((byte*)&t2_mean+3-i);
+
+            var[i+13]=*((byte*)&h2_mean+3-i);
+
+            var[i+17]=*((byte*)&t3_mean+3-i);
+
+            var[i+21]=*((byte*)&h3_mean+3-i);
+        }
+        String response = XML_response(&var[0],__SIZE_XML_RESPONSE_data__,pXML_RESP_data);
+        server.send(200, "text/xml", response);
+    });
+    
+          
+    // Start the server
+    server.begin();
+    Serial.println("Server started");
+    
     dht1.begin();
     dht2.begin();
     dht3.begin();
@@ -221,31 +285,10 @@ void setup()
 }
 
 void loop()
-{
-    client = server.available();  // try to get client
-    
-    if (client && (MeasureOK > 0))  // got client?
+{    
+    if (MeasureOK > 0)  // got client?
     {
-        unsigned long time1,time2;
-        Serial.println("new client");
-        time1=millis();
-        uint8_t timeout=0;
-        
-        while((!client.available()) && (timeout<10)){
-            delay(1);
-            timeout++;
-        }
-        processREQWIFI(&baseREQ,&orderREQ,&webREQ);
-        yield();
-        if (baseREQ||orderREQ||webREQ)
-        {
-            responseREQ(&baseREQ,&orderREQ,&webREQ);
-        }
-        
-        client.stop(); // close the connection
-        time2=millis();
-        Serial.print("HTTP request took  ");
-        Serial.print(time2-time1);
+        server.handleClient();
     }else if (configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_))
     {
        unsigned long time1,time2;
@@ -294,158 +337,7 @@ void loop()
         timeSample=millis();
     }else // the device is not configured
     {
-      
-    }
-}
-
-
-void processREQWIFI(byte *baseREQ,byte *orderREQ,byte *webREQ)
-{
-    // HTML BUFFER CONFIGURATION
-    #define REQ_BUF_SZ   60
-    char HTTP_req[REQ_BUF_SZ] = { 0 }; // buffered HTTP request stored as null terminated string
-    unsigned int req_index = 0;              // index into HTTP_req buffer
-
-    unsigned long time_ini = millis();
-    boolean buffer_overflow = false;
-    boolean currentLineIsBlank = true;
-    if (client.available()) {   // client data available to read
-        // last line of client request is blank and ends with 
-        String request = client.readStringUntil('\r');
-        client.flush();
-        Serial.println(request);
-
-        if (StrContains(&request[0], "orders"))
-          {
-                if (StrContains(&request[0], "SetConf"))// repeat this conditional for the different orders to be received             
-                {// request="POST /orders/SetConf.htm?DEVC=2 HTTP/1.1"
-                    *orderREQ = 10;
-                    uint8_t index=0;
-                    while (request[index]!='='){index++;}
-                    Serial.print("Found = at position ");
-                    Serial.println(index);
-                    index++;
-                    uint8_t code[3];
-                    uint8_t i=0;
-                    while (request[index]!=' ')
-                    {
-                      code[i]=request[index]-48; // to obtain the number from the ascii char
-                      index++;
-                      i++;
-                    }
-                    if (i==1){DeviceCode=code[0];}
-                    if (i==2){DeviceCode=code[0]*10+code[1];}
-                    if (i==3){DeviceCode=code[0]*100+code[1]*10+code[2];}
-                }
-                
-                if (StrContains(&request[0], "D1_ON"))
-                {
-                    *orderREQ=11;
-                }
-                
-                if (StrContains(&request[0], "D1_OFF"))
-                {
-                    *orderREQ=12;
-                }
-                
-                if (StrContains(&request[0], "LOG=1"))
-                {
-                    *orderREQ=13;
-                }
-                if (StrContains(&request[0], "resetStatics"))
-                {
-                    *orderREQ=14;
-                    Serial.println("Requested reset statics");
-                }
-                    
-          } 
-          
-          if (StrContains(&request[0], "Conf.xml"))
-          {
-            *baseREQ = 1;
-          }
-          
-          if (StrContains(&request[0], "data.xml"))
-          {
-            *baseREQ = 2;
-            //Serial.println("Requested powers");
-          }
-
-     }        
-}     
-
-void responseREQ(byte *baseREQ,byte *orderREQ,byte *webREQ)
-{
-    byte var[25];   
-    byte kk;
-    switch (*orderREQ)
-    {
-        case 10: // orders from the controller to setup the new configuration
-
-            *orderREQ=0;
-            EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
-            EEPROM.write(_EEPROMaddrIP_B1_,10);
-            EEPROM.write(_EEPROMaddrIP_B2_,10);
-            EEPROM.write(_EEPROMaddrIP_B3_,10);
-            EEPROM.write(_EEPROMaddrDEVICECODE_,DeviceCode);
-            EEPROM.end();
-            Serial.print("DeviceCode to be set at ");
-            Serial.println(DeviceCode);
-            
-            XML_response2(&kk,__SIZE_RESPONSE_OK__,pRESP_OK); // sends the status of all switches
-            break;  
-        
-        case 11: // Execution for Activate digital pin 1 
-        
-            *orderREQ=0;
-            break;  
-        
-        case 12: // Execution for Deactivate digital pin 1 
-        
-            *orderREQ=0;
-            break;  
-        
-        case 13: // Execution for Start logging 
-        
-            *orderREQ=0;
-            break;
-        case 14: // Execution for resetStatics
-            XML_response2(&kk,__SIZE_RESPONSE_OK__,pRESP_OK); // sends the status of all switches
-            initialize_statics();
-            *orderREQ=0;
-            break;    
-    
-    }
-    switch (*baseREQ)
-    {
-        case 1: // request of the configuration "Conf.xml"
-          XML_response2(&DeviceCode,__SIZE_XML_RESPONSE_Conf__,pXML_RESP_Conf); // sends the status of all switches
-          delay(10);
-          *baseREQ=0;
-          break; 
-            
-        case 2:   // request for "powers.xml"
-          
-          var[0]=STATUS_bits;
-          for (byte i=0;i<4;i++)
-          {
-             
-             var[i+1]=*((byte*)&t1_mean+3-i);
-
-             var[i+5]=*((byte*)&h1_mean+3-i);
-
-             var[i+9]=*((byte*)&t2_mean+3-i);
-
-             var[i+13]=*((byte*)&h2_mean+3-i);
-
-             var[i+17]=*((byte*)&t3_mean+3-i);
-
-             var[i+21]=*((byte*)&h3_mean+3-i);
-          }
-          XML_response2(&var[0],__SIZE_XML_RESPONSE_data__,pXML_RESP_data);
-          *baseREQ=0;
-          break;               
-
+        server.handleClient();
     }
 }
 
@@ -467,7 +359,7 @@ void initialize_statics()
   MeasureOK=0;
 }
 
-byte XML_response2(byte *data, const int num_bytes, const char *pRESP)
+String XML_response(byte *data, const int num_bytes, const char *pRESP)
 {
     uint8_t d = 0;
     String frame="";
@@ -487,48 +379,7 @@ byte XML_response2(byte *data, const int num_bytes, const char *pRESP)
             frame+=(*(pRESP + i));
         }
     }
-    Serial.println(frame);
-    client.print(frame);
+    return frame;
 }
 
-
-// sets every element of str to 0 (clears array)
-void StrClear(char *str, char length)
-{
-    for (int i = 0; i < length; i++) {
-        str[i] = 0;
-    }
-}
-
-// searches for the string sfind in the string str
-// returns 1 if sfind is found in str
-// returns 0 if sfind is not found in str
-byte StrContains(char *str, char *sfind)
-{
-    char found = 0;
-    char index = 0;
-    char lenstr, lensfind;
-
-    lenstr = strlen(str);
-    lensfind = strlen(sfind);
-    
-    while (index < lenstr) 
-    {
-        if (str[index] == sfind[found]) 
-        {
-            found++;
-            if (lensfind == found) 
-            {
-                return 1;
-            }
-        }
-        else 
-        {
-            found = 0;
-        }
-        index++;
-    }
-
-    return 0;
-}        
 
