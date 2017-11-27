@@ -74,10 +74,7 @@ const char *pRESP_OK    =    &response_ok._HTML_RESPONSE_OK_[0];
 const int __SIZE_RESPONSE_OK__    =    sizeof(response_ok);
 
 struct XML_RESPONSES_Conf
-{
-  const char  _HTML_RESPONSE_OK_[16];
-  const char _BLANKLINE_ ;
-  
+{ 
   const char _XML_HEADER_[25];
   const char _XML_TAG_[3];
   const char _XML_DEVT_TAG_[6];
@@ -88,8 +85,6 @@ struct XML_RESPONSES_Conf
   const char _cXML_DEVC_TAG_[7];
   const char _cXML_TAG_[5];
 }xml_response_Conf= {
-                 {'H','T','T','P','/','1','.','1',' ','2','0','0',' ','O','K','\n'},
-                  '\n',
                  {'<','?','x','m','l',' ','v','e','r','s','i','o','n',' ','=',' ','"','1','.','0','"',' ','?','>','\n'},
                  {'<','X','>'},
                  {'<','D','E','V','T','>'},{'3','x','D','H','T','2','2'},{'<','/','D','E','V','T','>'},
@@ -97,18 +92,11 @@ struct XML_RESPONSES_Conf
                  {'<','/','X','>','\n'}  
                 };
 
-const char *pXML_RESP_Conf    =    &xml_response_Conf._HTML_RESPONSE_OK_[0];
+const char *pXML_RESP_Conf    =    &xml_response_Conf._XML_HEADER_[0];
 const int __SIZE_XML_RESPONSE_Conf__    =    sizeof(xml_response_Conf);
 
 struct XML_RESPONSES_data
 {
-  const char  _HTML_RESPONSE_OK_[16];
-//  const char _KEEP_ALIVE_[30];
-//  const char _HTML_CONN_ALIVE_[23];
-//  const char _XML_CONTENT_TYPE_[30];
-  //  const char _USERAGENT_[24];
-  const char _BLANKLINE_ ;
-
   const char _XML_HEADER_[25];
   const char _XML_TAG_[3];
   const char _XML_DEV_TAG_[5];
@@ -121,12 +109,6 @@ struct XML_RESPONSES_data
   struct XML_TAGS_FLOAT FLOAT_DATA_TAGS[6];
   const char _cXML_TAG_[5];
 }xml_response_data = {
-                 {'H','T','T','P','/','1','.','1',' ','2','0','0',' ','O','K','\n'},
-//                 {'K','e','e','p','-','A','l','i','v','e',':',' ','t','i','m','e','o','u','t','=','5',',',' ','m','a','x','=','9','9','\n'},
-//                 {'C','o','n','n','e','c','t','i','o','n',':',' ','K','e','e','p','-','A','l','i','v','e','\n'},
-//                 {'C','o','n','t','e','n','t','-','T','y','p','e',':',' ','a','p','p','l','i','c','a','t','i','o','n','/','x','m','l','\n'},
-//                  {'U','s','e','r','-','A','g','e','n','t',':',' ','M','o','z','i','l','l','a','/','5','.','0','\n'},
-                 '\n',
                  {'<','?','x','m','l',' ','v','e','r','s','i','o','n',' ','=',' ','"','1','.','0','"',' ','?','>','\n'},
                  {'<','X','>'},
                  {'<','D','E','V','>'},{'#'},{'<','/','D','E','V','>'},
@@ -135,7 +117,7 @@ struct XML_RESPONSES_data
                  {'<','/','X','>','\n'}  
                 };
 
-const char *pXML_RESP_data = &xml_response_data._HTML_RESPONSE_OK_[0];
+const char *pXML_RESP_data = &xml_response_data._XML_HEADER_[0];
 const int __SIZE_XML_RESPONSE_data__ = sizeof(xml_response_data);
 
 
@@ -219,7 +201,7 @@ void setup()
         Serial.println("MDNS responder started");
     }
     
-    server.on("/orders/SetConf", [](){
+    server.on("/orders/SetConf.htm", [](){
         if (server.arg("DEVC")!= "")  
         {
           DeviceCode = server.arg("DEVC").toInt();              //Get the value of the parameter
@@ -248,7 +230,9 @@ void setup()
   
     server.on("/Conf.xml", [](){
         String response = XML_response(&DeviceCode,__SIZE_XML_RESPONSE_Conf__,pXML_RESP_Conf); // sends the status of all switches
+        //Serial.print(response);
         server.send(200, "text/xml", response);
+        delay(200);
     });
     
     server.on("/data.xml", [](){
@@ -270,6 +254,7 @@ void setup()
             var[i+21]=*((byte*)&h3_mean+3-i);
         }
         String response = XML_response(&var[0],__SIZE_XML_RESPONSE_data__,pXML_RESP_data);
+        
         server.send(200, "text/xml", response);
     });
     
@@ -335,10 +320,9 @@ void loop()
               MeasureOK=1;
             }
         timeSample=millis();
-    }else // the device is not configured
-    {
-        server.handleClient();
     }
+    
+    server.handleClient();
 }
 
 void initialize_statics()
