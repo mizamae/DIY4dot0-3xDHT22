@@ -18,7 +18,7 @@ DHT dht2(DHTPin2, DHTTYPE);
 DHT dht3(DHTPin3, DHTTYPE);
 static float t1_mean=0,h1_mean=0,t2_mean=0,h2_mean=0,t3_mean=0,h3_mean=0;
 static int t1_number=0,h1_number=0,t2_number=0,h2_number=0,t3_number=0,h3_number=0;
-static byte STATUS_bits=0,MeasureOK=0;
+static byte STATUS_bits=0,Measure1OK=0,Measure2OK=0,Measure3OK=0;
 
 
 
@@ -225,6 +225,7 @@ void setup()
     
     server.on("/orders/resetStatics", [](){
         server.send(200, "text/html", "");
+        Serial.print("Statics resetted");
         initialize_statics();
     });
   
@@ -237,25 +238,68 @@ void setup()
     
     server.on("/data.xml", [](){
         byte var[25];  
+        float t1,h1,t2,h2,t3,h3;
+        yield();
+        if (Measure1OK==1)
+        {
+          h1=h1_mean;
+          t1=t1_mean;
+        }else
+        {// no good measurement, send a NaN
+          for (byte i=0;i<4;i++)
+          {
+            *((byte*)&t1+3-i)=0xFF;
+            *((byte*)&h1+3-i)=0xFF;
+          }
+          STATUS_bits|=1<<0;
+        }
+        if (Measure2OK==1)
+        {
+          h2=h2_mean;
+          t2=t2_mean;
+        }else
+        {// no good measurement, send a NaN
+          for (byte i=0;i<4;i++)
+          {
+            *((byte*)&t2+3-i)=0xFF;
+            *((byte*)&h2+3-i)=0xFF;
+          }
+          STATUS_bits|=1<<1;
+        }
+        if (Measure3OK==1)
+        {
+          h3=h3_mean;
+          t3=t3_mean;
+        }else
+        {// no good measurement, send a NaN
+          for (byte i=0;i<4;i++)
+          {
+            *((byte*)&t3+3-i)=0xFF;
+            *((byte*)&h3+3-i)=0xFF;
+          }
+          STATUS_bits|=1<<2;
+        }
+        
         var[0]=STATUS_bits;
         for (byte i=0;i<4;i++)
         {
-         
-            var[i+1]=*((byte*)&t1_mean+3-i);
+            yield();
+            var[i+1]=*((byte*)&t1+3-i);
 
-            var[i+5]=*((byte*)&h1_mean+3-i);
+            var[i+5]=*((byte*)&h1+3-i);
 
-            var[i+9]=*((byte*)&t2_mean+3-i);
+            var[i+9]=*((byte*)&t2+3-i);
 
-            var[i+13]=*((byte*)&h2_mean+3-i);
+            var[i+13]=*((byte*)&h2+3-i);
 
-            var[i+17]=*((byte*)&t3_mean+3-i);
+            var[i+17]=*((byte*)&t3+3-i);
 
-            var[i+21]=*((byte*)&h3_mean+3-i);
+            var[i+21]=*((byte*)&h3+3-i);
         }
         String response = XML_response(&var[0],__SIZE_XML_RESPONSE_data__,pXML_RESP_data);
         
         server.send(200, "text/xml", response);
+        Serial.print(response);
     });
     
           
@@ -271,57 +315,116 @@ void setup()
 
 void loop()
 {    
-    if (MeasureOK > 0)  // got client?
+    if (configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_))
     {
-        server.handleClient();
-    }else if (configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_))
-    {
-       unsigned long time1,time2;
-       time1=millis();
-       float h1 = dht1.readHumidity();
-       float t1 = dht1.readTemperature();// Read temperature as Celsius (the default)
-       float h2 = dht2.readHumidity();
-       float t2 = dht2.readTemperature();// Read temperature as Celsius (the default)
-       float h3 = dht3.readHumidity();
-       float t3 = dht3.readTemperature();// Read temperature as Celsius (the default)
-       time2=millis();
+        unsigned long time1,time2;
+        time1=millis();
+        float h1 = dht1.readHumidity();
+        yield();
+        float t1 = dht1.readTemperature();// Read temperature as Celsius (the default)
+        delay(100);
+        float h2 = dht2.readHumidity();
+        yield();
+        float t2 = dht2.readTemperature();// Read temperature as Celsius (the default)
+        delay(100);
+        float h3 = dht3.readHumidity();
+        yield();
+        float t3 = dht3.readTemperature();// Read temperature as Celsius (the default)
+        time2=millis();
+
+        if (isnan(h1) || isnan(t1) ) 
+        { 
+                
+        }
+        else
+        {
+          h1_number++;
+          t1_number++;
+          h1_mean=h1_mean+(h1-h1_mean)/h1_number; // moving average
+          t1_mean=t1_mean+(t1-t1_mean)/t1_number; // moving average
+          STATUS_bits&=~(1<<0);
+          Measure1OK=1;
+        }
+        yield();
+        if (isnan(h2) || isnan(t2) ) 
+        {
        
-       if (isnan(h1) || isnan(t1) ) { 
-              STATUS_bits|=1;      
-            }
-       else{
-              h1_number++;
-              t1_number++;
-              h1_mean=h1_mean+(h1-h1_mean)/h1_number; // moving average
-              t1_mean=t1_mean+(t1-t1_mean)/t1_number; // moving average
-              STATUS_bits&=~(1<<0);
-              MeasureOK=1;
-            }
-       if (isnan(h2) || isnan(t2) ) {
-              STATUS_bits|=1<<1;         
-            }
-       else{
-              h2_number++;
-              t2_number++;
-              h2_mean=h2_mean+(h2-h2_mean)/h2_number; // moving average
-              t2_mean=t2_mean+(t2-t2_mean)/t2_number; // moving average
-              STATUS_bits&=~(1<<1);
-              MeasureOK=1;
-            }
-       if (isnan(h3) || isnan(t3) ) {
-              STATUS_bits|=1<<2;        
-            }
-       else{
-              h3_number++;
-              t3_number++;
-              h3_mean=h3_mean+(h3-h3_mean)/h3_number; // moving average
-              t3_mean=t3_mean+(t3-t3_mean)/t3_number; // moving average
-              STATUS_bits&=~(1<<2);
-              MeasureOK=1;
-            }
+        }
+        else
+        {
+          h2_number++;
+          t2_number++;
+          h2_mean=h2_mean+(h2-h2_mean)/h2_number; // moving average
+          t2_mean=t2_mean+(t2-t2_mean)/t2_number; // moving average
+          STATUS_bits&=~(1<<1);
+          Measure2OK=1;
+        }
+        yield();
+        if (isnan(h3) || isnan(t3) ) 
+        {
+      
+        }
+        else
+        {
+          h3_number++;
+          t3_number++;
+          h3_mean=h3_mean+(h3-h3_mean)/h3_number; // moving average
+          t3_mean=t3_mean+(t3-t3_mean)/t3_number; // moving average
+          STATUS_bits&=~(1<<2);
+          Measure3OK=1;
+        }
         timeSample=millis();
     }
-    
+
+    if (!configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_))
+    {
+        unsigned long time1,time2;
+        time1=millis();
+        float h1 = dht1.readHumidity();
+        float t1 = dht1.readTemperature();// Read temperature as Celsius (the default)
+        delay(100);
+        float h2 = dht2.readHumidity();
+        float t2 = dht2.readTemperature();// Read temperature as Celsius (the default)
+        delay(100);
+        float h3 = dht3.readHumidity();
+        float t3 = dht3.readTemperature();// Read temperature as Celsius (the default)
+        time2=millis();
+
+        if (isnan(h1) || isnan(t1) ) 
+        { 
+          Serial.println("Failed to read from DHT sensor 1!");     
+        }else
+        {
+          Serial.print("Humidity: ");
+          Serial.print(h1);
+          Serial.print(" %\t");
+          Serial.print("Temperature: ");
+          Serial.println(t1);
+        }
+        if (isnan(h2) || isnan(t2) ) 
+        { 
+          Serial.println("Failed to read from DHT sensor 2!");     
+        }else
+        {
+          Serial.print("Humidity: ");
+          Serial.print(h2);
+          Serial.print(" %\t");
+          Serial.print("Temperature: ");
+          Serial.println(t2);
+        }
+        if (isnan(h3) || isnan(t3) ) 
+        { 
+          Serial.println("Failed to read from DHT sensor 3!");     
+        }else
+        {
+          Serial.print("Humidity: ");
+          Serial.print(h3);
+          Serial.print(" %\t");
+          Serial.print("Temperature: ");
+          Serial.println(t3);
+        }
+        timeSample=millis();
+    }
     server.handleClient();
 }
 
@@ -339,8 +442,9 @@ void initialize_statics()
   h1_number=0;
   h2_number=0;
   h3_number=0;
-  STATUS_bits=0;
-  MeasureOK=0;
+  Measure1OK=0;
+  Measure2OK=0;
+  Measure3OK=0;
 }
 
 String XML_response(byte *data, const int num_bytes, const char *pRESP)
