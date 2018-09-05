@@ -9,9 +9,9 @@
 #define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
 // DHT Sensor
-const int DHTPin1 = 0;
-const int DHTPin2 = 2;
-const int DHTPin3 = 4;
+const int DHTPin1 = 2; //D4
+const int DHTPin2 = 4; //D2
+const int DHTPin3 = 5; //D1
 // Initialize DHT sensor.
 DHT dht1(DHTPin1, DHTTYPE);
 DHT dht2(DHTPin2, DHTTYPE);
@@ -134,16 +134,25 @@ const byte _CONF_BTN_                    = 0;        // pin to initiate config p
 
 static bool configured_device=false;
 static unsigned long timeSample;
-const unsigned long _SAMPLETIME_        = 10000;    // sample time in ms 
+const unsigned long _SAMPLETIME_        = 20000;    // sample time in ms 
 void setup()
 {
     Serial.begin(115200);
     
+    // TO FORCE CERTAIN IP ADDRESS
+//    EEPROM.begin(512);
+//    DeviceCode=4;
+//    EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
+//    EEPROM.write(_EEPROMaddrIP_B1_,10);
+//    EEPROM.write(_EEPROMaddrIP_B2_,10);
+//    EEPROM.write(_EEPROMaddrIP_B3_,10);
+//    EEPROM.write(_EEPROMaddrDEVICECODE_,DeviceCode);
+//    EEPROM.end();
+    // END
     EEPROM.begin(512);
     DeviceCode = EEPROM.read(_EEPROMaddrDEVICECODE_);
     Serial.print("DeviceCode in EEPROM: ");
     Serial.println(DeviceCode);
-    //DeviceCode=255;
     
     if ((DeviceCode==255)||(DeviceCode==254)||!digitalRead(_CONF_BTN_)) // the device has not been configured. This is so in Arduino devices where EEPROM defaults to 255. In ESP8266 flash is randomly defaulted!!!
     {
@@ -469,5 +478,3 @@ String XML_response(byte *data, const int num_bytes, const char *pRESP)
     }
     return frame;
 }
-
-
