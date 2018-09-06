@@ -6,7 +6,9 @@
 #include <EEPROM.h>
 #include <SPI.h>                         // Include the SPI library
 
-#define __TEST__
+#include <ESP8266HTTPUpdateServer.h>
+
+//#define __TEST__
 #define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
 // DHT Sensor
@@ -37,6 +39,7 @@ float DewPoint_centdeg;
 
 MDNSResponder mdns;
 ESP8266WebServer server(80);
+ESP8266HTTPUpdateServer httpUpdater;
 
 static uint8_t baseREQ=0,orderREQ=0,webREQ=0; 
 
@@ -136,20 +139,21 @@ const byte _CONF_BTN_                    = 0;        // pin to initiate config p
 static bool configured_device=false;
 static unsigned long timeSample;
 const unsigned long _SAMPLETIME_        = 20000;    // sample time in ms 
+
 void setup()
 {
     Serial.begin(115200);
     
     // TO FORCE CERTAIN IP ADDRESS
     #ifdef __TEST__
-    EEPROM.begin(512);
-    DeviceCode=255;
-    EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
-    EEPROM.write(_EEPROMaddrIP_B1_,10);
-    EEPROM.write(_EEPROMaddrIP_B2_,10);
-    EEPROM.write(_EEPROMaddrIP_B3_,10);
-    EEPROM.write(_EEPROMaddrDEVICECODE_,DeviceCode);
-    EEPROM.end();
+      EEPROM.begin(512);
+      DeviceCode=4;
+      EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
+      EEPROM.write(_EEPROMaddrIP_B1_,10);
+      EEPROM.write(_EEPROMaddrIP_B2_,10);
+      EEPROM.write(_EEPROMaddrIP_B3_,10);
+      EEPROM.write(_EEPROMaddrDEVICECODE_,DeviceCode);
+      EEPROM.end();
     #endif
     // END
     EEPROM.begin(512);
@@ -212,6 +216,7 @@ void setup()
     if (mdns.begin("esp8266", WiFi.localIP())) {
         Serial.println("MDNS responder started");
     }
+
     
     server.on("/orders/SetConf.htm", [](){
         if (server.arg("DEVC")!= "")  
@@ -316,6 +321,7 @@ void setup()
     
           
     // Start the server
+    httpUpdater.setup(&server);
     server.begin();
     Serial.println("Server started");
     
@@ -392,14 +398,32 @@ void loop()
     {
         unsigned long time1,time2;
         time1=millis();
+        h1_number=1;
+        t1_number=1;
+        h2_number=1;
+        t2_number=1;
+        h3_number=1;
+        t3_number=1;
+        Measure1OK=1;
+        Measure2OK=1;
+        Measure3OK=1;
         float h1 = dht1.readHumidity();
+        h1_mean=h1;
         float t1 = dht1.readTemperature();// Read temperature as Celsius (the default)
+        t1_mean=t1;
+        if (isnan(h1) || isnan(t1) ){Measure1OK=0;}
         delay(100);
         float h2 = dht2.readHumidity();
+        h2_mean=h2;
         float t2 = dht2.readTemperature();// Read temperature as Celsius (the default)
+        t2_mean=t2;
+        if (isnan(h2) || isnan(t2) ){Measure2OK=0;}
         delay(100);
         float h3 = dht3.readHumidity();
+        h3_mean=h3;
         float t3 = dht3.readTemperature();// Read temperature as Celsius (the default)
+        t3_mean=t3;
+        if (isnan(h3) || isnan(t3) ){Measure3OK=0;}
         time2=millis();
         Serial.println("NEW MEASUREMENT CYCLE:");
         if (isnan(h1) || isnan(t1) ) 
