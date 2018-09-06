@@ -6,12 +6,13 @@
 #include <EEPROM.h>
 #include <SPI.h>                         // Include the SPI library
 
+#define __TEST__
 #define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
 // DHT Sensor
-const int DHTPin1 = 2; //D4
-const int DHTPin2 = 4; //D2
-const int DHTPin3 = 5; //D1
+const int DHTPin1 = D5; //D4
+const int DHTPin2 = D6; //D2
+const int DHTPin3 = D7; //D1
 // Initialize DHT sensor.
 DHT dht1(DHTPin1, DHTTYPE);
 DHT dht2(DHTPin2, DHTTYPE);
@@ -140,14 +141,16 @@ void setup()
     Serial.begin(115200);
     
     // TO FORCE CERTAIN IP ADDRESS
-//    EEPROM.begin(512);
-//    DeviceCode=4;
-//    EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
-//    EEPROM.write(_EEPROMaddrIP_B1_,10);
-//    EEPROM.write(_EEPROMaddrIP_B2_,10);
-//    EEPROM.write(_EEPROMaddrIP_B3_,10);
-//    EEPROM.write(_EEPROMaddrDEVICECODE_,DeviceCode);
-//    EEPROM.end();
+    #ifdef __TEST__
+    EEPROM.begin(512);
+    DeviceCode=255;
+    EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
+    EEPROM.write(_EEPROMaddrIP_B1_,10);
+    EEPROM.write(_EEPROMaddrIP_B2_,10);
+    EEPROM.write(_EEPROMaddrIP_B3_,10);
+    EEPROM.write(_EEPROMaddrDEVICECODE_,DeviceCode);
+    EEPROM.end();
+    #endif
     // END
     EEPROM.begin(512);
     DeviceCode = EEPROM.read(_EEPROMaddrDEVICECODE_);
@@ -398,13 +401,13 @@ void loop()
         float h3 = dht3.readHumidity();
         float t3 = dht3.readTemperature();// Read temperature as Celsius (the default)
         time2=millis();
-
+        Serial.println("NEW MEASUREMENT CYCLE:");
         if (isnan(h1) || isnan(t1) ) 
         { 
           Serial.println("Failed to read from DHT sensor 1!");     
         }else
         {
-          Serial.print("Humidity: ");
+          Serial.print("SENSOR 1 Humidity: ");
           Serial.print(h1);
           Serial.print(" %\t");
           Serial.print("Temperature: ");
@@ -415,7 +418,7 @@ void loop()
           Serial.println("Failed to read from DHT sensor 2!");     
         }else
         {
-          Serial.print("Humidity: ");
+          Serial.print("SENSOR 2 Humidity: ");
           Serial.print(h2);
           Serial.print(" %\t");
           Serial.print("Temperature: ");
@@ -426,7 +429,7 @@ void loop()
           Serial.println("Failed to read from DHT sensor 3!");     
         }else
         {
-          Serial.print("Humidity: ");
+          Serial.print("SENSOR 3 Humidity: ");
           Serial.print(h3);
           Serial.print(" %\t");
           Serial.print("Temperature: ");
