@@ -321,7 +321,10 @@ void setup()
     
           
     // Start the server
-    httpUpdater.setup(&server);
+    const char * path = "/firmwareupdate";
+    const char * username = "diy4dot0";
+    const char * password = "diy4dot0";
+    httpUpdater.setup(&server,path,username,password);
     server.begin();
     Serial.println("Server started");
     
