@@ -5,12 +5,14 @@
 #include <ESP8266mDNS.h>
 #include <EEPROM.h>
 #include <SPI.h>                         // Include the SPI library
-
+#include <FS.h>
 #include <ESP8266HTTPUpdateServer.h>
 
-//#define __TEST__
+#define __TEST__
 #define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
+unsigned long timeNoPoll;
+        
 // DHT Sensor
 const int DHTPin1 = D5; //D4
 const int DHTPin2 = D6; //D2
@@ -140,6 +142,8 @@ static bool configured_device=false;
 static unsigned long timeSample;
 const unsigned long _SAMPLETIME_        = 20000;    // sample time in ms 
 
+bool stopPolling=false,data_request=false;
+
 void setup()
 {
     Serial.begin(115200);
@@ -147,7 +151,7 @@ void setup()
     // TO FORCE CERTAIN IP ADDRESS
     #ifdef __TEST__
       EEPROM.begin(512);
-      DeviceCode=4;
+      DeviceCode=254;
       EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
       EEPROM.write(_EEPROMaddrIP_B1_,10);
       EEPROM.write(_EEPROMaddrIP_B2_,10);
@@ -165,9 +169,9 @@ void setup()
     {
         DeviceCode=254;
         IPaddr[0]=254;
-        IPaddr[1]=10;
-        IPaddr[2]=10;
-        IPaddr[3]=10;
+        IPaddr[1]=0;
+        IPaddr[2]=168;
+        IPaddr[3]=192;
         Serial.println("Unconfigured device");
         configured_device=false;
     }else
@@ -217,6 +221,9 @@ void setup()
         Serial.println("MDNS responder started");
     }
 
+    dht1.begin();
+    dht2.begin();
+    dht3.begin();
     
     server.on("/orders/SetConf.htm", [](){
         if (server.arg("DEVC")!= "")  
@@ -251,6 +258,10 @@ void setup()
         //Serial.print(response);
         server.send(200, "text/xml", response);
         delay(200);
+    });
+
+    server.on("/measure.xml", [](){
+        data_request=true;
     });
     
     server.on("/data.xml", [](){
@@ -316,10 +327,22 @@ void setup()
         String response = XML_response(&var[0],__SIZE_XML_RESPONSE_data__,pXML_RESP_data);
         
         server.send(200, "text/xml", response);
-        Serial.print(response);
+        Serial.println(response);
     });
     
-          
+
+    if (!SPIFFS.begin())
+    {
+      // Serious problem
+      Serial.println("SPIFFS Mount failed");
+    } else {
+      Serial.println("SPIFFS Mount succesfull");
+    }
+  
+    server.serveStatic("/img", SPIFFS, "/img");
+    server.serveStatic("/", SPIFFS, "/index.html");
+  
+
     // Start the server
     const char * path = "/firmwareupdate";
     const char * username = "diy4dot0";
@@ -328,15 +351,71 @@ void setup()
     server.begin();
     Serial.println("Server started");
     
-    dht1.begin();
-    dht2.begin();
-    dht3.begin();
+    
     timeSample=millis();
 }
 
 void loop()
 {    
-    if (configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_))
+    if (data_request){
+        byte var[25];
+        data_request=false;
+        Serial.println("Automatic polling stopped");
+        stopPolling=true;  
+        timeNoPoll=millis();
+        yield();
+        float h1 = dht1.readHumidity();
+        float t1 = dht1.readTemperature();
+        delay(100);
+        if (isnan(h1) || isnan(t1) ){
+          for (byte i=0;i<4;i++)
+          {
+            *((byte*)&t1+3-i)=0xFF;
+            *((byte*)&h1+3-i)=0xFF;
+          }
+        }
+        float h2 = dht2.readHumidity();
+        float t2 = dht2.readTemperature();
+        delay(100);
+        if (isnan(h2) || isnan(t2) ){
+          for (byte i=0;i<4;i++)
+          {
+            *((byte*)&t2+3-i)=0xFF;
+            *((byte*)&h2+3-i)=0xFF;
+          }
+        }
+        float h3 = dht3.readHumidity();
+        float t3 = dht3.readTemperature();
+        delay(100);
+        if (isnan(h3) || isnan(t3) ){
+          for (byte i=0;i<4;i++)
+          {
+            *((byte*)&t3+3-i)=0xFF;
+            *((byte*)&h3+3-i)=0xFF;
+          }
+        }
+        var[0]=0;
+        for (byte i=0;i<4;i++)
+        {
+            yield();
+            var[i+1]=*((byte*)&t1+3-i);
+
+            var[i+5]=*((byte*)&h1+3-i);
+
+            var[i+9]=*((byte*)&t2+3-i);
+
+            var[i+13]=*((byte*)&h2+3-i);
+
+            var[i+17]=*((byte*)&t3+3-i);
+
+            var[i+21]=*((byte*)&h3+3-i);
+        }
+        String response = XML_response(&var[0],__SIZE_XML_RESPONSE_data__,pXML_RESP_data);
+        
+        server.send(200, "text/xml", response);  
+    }
+    
+    if (configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_) && !stopPolling)
     {
         unsigned long time1,time2;
         time1=millis();
@@ -397,7 +476,7 @@ void loop()
         timeSample=millis();
     }
 
-    if (!configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_))
+    if (!configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_) && !stopPolling)
     {
         unsigned long time1,time2;
         time1=millis();
@@ -464,6 +543,8 @@ void loop()
         }
         timeSample=millis();
     }
+
+    if (stopPolling&&(millis()-timeNoPoll>=_SAMPLETIME_)){stopPolling=false;Serial.println("Automatic polling restored");}
     server.handleClient();
 }
 

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html charset="UTF-8">
+  <head>
+    <meta name="viewport">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.11.0/bootstrap-table.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.11.0/bootstrap-table.min.js"></script>
+    <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/superhero/bootstrap.min.css" rel="stylesheet" title="main">
+    <title>3xDHT22 Diagnosis page</title>
+	<script>    
+		var xDoc, parser	=	new	DOMParser(), request	=	new	XMLHttpRequest();
+		var typeREQ="measure.xml";
+		function	send_request()
+		{	request.open("GET",	typeREQ	+"?t="	+	Math.random(),	true);
+			request.send(null);
+			
+		}
+		request.onreadystatechange	=	function()
+		{	if	((this.readyState	==	4)	&&	(this.status	==	200)){
+					xDoc	=	parser.parseFromString(this.responseText,	"application/xml");
+					var	n	=	this.responseText.includes("<AV>");
+					if (n) {updateValues();}
+			}
+		}
+		
+		function	Bytes2Float32(bytes)
+		{	var	sign	=	(bytes	<	0)	?	-1:1,	exponent	=	((bytes>>23)	&	0xFF)-127,	significand=(bytes	&	~(-1<<23));
+			if	(exponent	==	128)return	sign*((significand)?	Number.NaN	:	Number.POSITIVE_INFINITY);
+			if	(exponent	==	-127)
+			{	if	(significand==0)	return	sign	*	0.0;exponent=-126;significand	/=	(1<<22);
+			}else	significand	=	(significand	|	(1<<23))/(1<<23);
+			return	sign	*	significand	*	Math.pow(2,exponent);
+		}
+		
+		function updateValues()
+		{
+			document.getElementById("timestamp").innerHTML=(new Date()).toLocaleString();
+			var	str=xDoc.getElementsByTagName('AV')[0].childNodes[0].nodeValue;
+			vector=str.split(",");	
+			bin_number=(vector[0]<<24)	|	(vector[1]<<16)	|	(vector[2]<<8)	|	(vector[3]);
+			T1	=	Bytes2Float32(bin_number).toFixed(2);
+			document.getElementById("T1").innerHTML=T1;
+			str=xDoc.getElementsByTagName('AV')[1].childNodes[0].nodeValue;
+			vector=str.split(",");	
+			bin_number=(vector[0]<<24)	|	(vector[1]<<16)	|	(vector[2]<<8)	|	(vector[3]);
+			H1	=	Bytes2Float32(bin_number).toFixed(2);
+			document.getElementById("H1").innerHTML=H1;
+			
+			str=xDoc.getElementsByTagName('AV')[2].childNodes[0].nodeValue;
+			vector=str.split(",");	
+			bin_number=(vector[0]<<24)	|	(vector[1]<<16)	|	(vector[2]<<8)	|	(vector[3]);
+			T2	=	Bytes2Float32(bin_number).toFixed(2);
+			document.getElementById("T2").innerHTML=T2;
+			str=xDoc.getElementsByTagName('AV')[3].childNodes[0].nodeValue;
+			vector=str.split(",");	
+			bin_number=(vector[0]<<24)	|	(vector[1]<<16)	|	(vector[2]<<8)	|	(vector[3]);
+			H2	=	Bytes2Float32(bin_number).toFixed(2);
+			document.getElementById("H2").innerHTML=H2;
+			
+			str=xDoc.getElementsByTagName('AV')[4].childNodes[0].nodeValue;
+			vector=str.split(",");	
+			bin_number=(vector[0]<<24)	|	(vector[1]<<16)	|	(vector[2]<<8)	|	(vector[3]);
+			T3	=	Bytes2Float32(bin_number).toFixed(2);
+			document.getElementById("T3").innerHTML=T3;
+			
+			str=xDoc.getElementsByTagName('AV')[5].childNodes[0].nodeValue;
+			vector=str.split(",");	
+			bin_number=(vector[0]<<24)	|	(vector[1]<<16)	|	(vector[2]<<8)	|	(vector[3]);
+			H3	=	Bytes2Float32(bin_number).toFixed(2);
+			document.getElementById("H3").innerHTML=H3;
+		}
+    </script>
+  </head>
+  <body	onload='setInterval(function(){send_request()},	10000);'>
+    <div class="container-fluid">
+      <h1>3xDHT22</h1>
+      <div class="tab-content">       
+          <h2>Real-time Measurements</h2>
+		  <h3>Last data requested <span id="timestamp"></span></h3>
+          <table id="tab_mesures" data-toggle="table" data-show-colunns="true">
+            <thead>
+              <tr>
+				<th data-align="left" >Sensor</th>
+                <th data-align="left" >Temperature</th>
+                <th data-align="left" >Humidity</th>
+              </tr>
+            </thead>
+			<tbody>
+				<tr>
+					<td	width="25%">Sensor 1</td>
+					<td	width="25%"><span id="T1">25</span>&deg;C</td>
+					<td	width="25%"><span id="H1">25</span>&#37;</td>
+				</tr>
+				<tr>
+					<td	width="25%">Sensor 2</td>
+					<td	width="25%"><span id="T2">25</span>&deg;C</td>
+					<td	width="25%"><span id="H2">25</span>&#37;</td>
+				</tr>
+				<tr>
+					<td	width="25%">Sensor 3</td>
+					<td	width="25%"><span id="T3">25</span>&deg;C</td>
+					<td	width="25%"><span id="H3">25</span>&#37;</td>
+				</tr>
+			</tbody>
+          </table>
+      </div>
+      <div class="row" style="position:absolute; bottom:0; width:100%">
+        <div class="col-xs-2 col-md-2"><img src="img/logo.png" width="30" height="30"></div>
+      </div>
+    </div>
+  </body>
+</html>
