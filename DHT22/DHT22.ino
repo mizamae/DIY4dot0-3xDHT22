@@ -7,7 +7,7 @@
 #include <SPI.h>                         // Include the SPI library
 #include <FS.h>
 #include <ESP8266HTTPUpdateServer.h>
-
+#include "wifi_details.h"
 #define __TEST__
 #define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
@@ -29,8 +29,6 @@ static byte STATUS_bits=0,Measure1OK=0,Measure2OK=0,Measure3OK=0;
 
 // MAC address from Ethernet shield sticker under board
 //byte mac[] = { 0xDE, 0xAD, 0xBE, 0x41, 0x42, 0x21 }; // make sure you change these values so that no MAC collision exist in your network
-const char* ssid = "diy4dot0";
-const char* password = "Valtierra1981";
 
 uint8_t IPaddr[4];
 uint8_t DeviceCode;
@@ -373,7 +371,8 @@ void loop()
             *((byte*)&t1+3-i)=0xFF;
             *((byte*)&h1+3-i)=0xFF;
           }
-        }
+          STATUS_bits|=1<<0;
+        }else{STATUS_bits&=~(1<<0);}
         float h2 = dht2.readHumidity();
         float t2 = dht2.readTemperature();
         delay(100);
@@ -383,7 +382,8 @@ void loop()
             *((byte*)&t2+3-i)=0xFF;
             *((byte*)&h2+3-i)=0xFF;
           }
-        }
+          STATUS_bits|=1<<1;
+        }else{STATUS_bits&=~(1<<1);}
         float h3 = dht3.readHumidity();
         float t3 = dht3.readTemperature();
         delay(100);
@@ -393,8 +393,9 @@ void loop()
             *((byte*)&t3+3-i)=0xFF;
             *((byte*)&h3+3-i)=0xFF;
           }
-        }
-        var[0]=0;
+          STATUS_bits|=1<<2;
+        }else{STATUS_bits&=~(1<<2);}
+        var[0]=STATUS_bits;
         for (byte i=0;i<4;i++)
         {
             yield();

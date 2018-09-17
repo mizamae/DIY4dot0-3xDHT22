@@ -7,10 +7,18 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.11.0/bootstrap-table.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.11.0/bootstrap-table.min.js"></script>
     <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/superhero/bootstrap.min.css" rel="stylesheet" title="main">
+	<script	src="https://code.highcharts.com/highcharts.js"></script>
     <title>3xDHT22 Diagnosis page</title>
 	<script>    
 		var xDoc, parser	=	new	DOMParser(), request	=	new	XMLHttpRequest();
 		var typeREQ="measure.xml";
+		var T1,T2,T3,error1=0,error2=0,error3=0;
+		
+		function	checkBit(number,n)
+		{	var	mask	=	1	<<	n;	
+			if	((number	&	mask)	!=	0)	{return	1;}else	{return	0;}
+		}
+		
 		function	send_request()
 		{	request.open("GET",	typeREQ	+"?t="	+	Math.random(),	true);
 			request.send(null);
@@ -33,9 +41,59 @@
 			return	sign	*	significand	*	Math.pow(2,exponent);
 		}
 		
+		function	plotLiveValues()
+		{	$(function	()	{
+				$(document).ready(function	()	{
+					Highcharts.setOptions({global:	{useUTC:	false}});
+					var chart = Highcharts.chart('container',	{
+						chart:	{//type:	'line',
+								animation:	Highcharts.svg,
+								marginRight:	50,
+								events:	{load:	function	()	{var graph=this;
+										timerChart=setInterval(function	()	{
+										var	x	=	(new	Date()).getTime();
+										graph.series[0].addPoint([x,	parseFloat(T1)],	true,	true);
+										graph.series[1].addPoint([x,	parseFloat(T2)],	true,	true);
+										graph.series[2].addPoint([x,	parseFloat(T3)],	true,	true);
+										graph.series[3].addPoint([x,	parseFloat(error1)],	true,	true);
+										graph.series[4].addPoint([x,	parseFloat(error2)],	true,	true);
+										graph.series[5].addPoint([x,	parseFloat(error3)],	true,	true);
+										},	10000);}}},
+						title:	{text:	'Real-time variables'},
+						xAxis:	{type:	'datetime',tickPixelInterval:	150},
+						yAxis:	[{title:	{text:	'Temperature [degC]'},plotLines:	[{value:	0,width:	1,color:	'#808080'}],max:null,min:null},
+								{title:	{text:	'Errors'},allowDecimals: false,plotLines:	[{value:	0,width:	1,color:	'#808080'}],opposite: true, min:0}],
+						tooltip:	{formatter:	function	()	{return	'<b>'+this.series.name+'</b><br/>'+Highcharts.dateFormat('%H:%M:%S',	this.x)+'<br/>'+Highcharts.numberFormat(this.y,	2);}},
+						legend:	{enabled:	true},
+						series:	[{name:	'Tsensor1',type: 'spline',data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
+																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:20});}
+																		return	data;}())},
+								{name:	'Tsensor2',type: 'spline',data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
+																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:20});}
+																		return	data;}())},
+								{name:	'Tsensor3',type: 'spline',data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
+																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:20});}
+																		return	data;}())},
+								{name:	'Error1',type: 'line',yAxis: 1,data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
+																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:0});}
+																		return	data;}()),step: 'right'},
+								{name:	'Error2',type: 'line',yAxis: 1,data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
+																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:0});}
+																		return	data;}()),step: 'right'},
+								{name:	'Error3',type: 'line',yAxis: 1,data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
+																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:0});}
+																		return	data;}()),step: 'right'},
+								]});
+				});});
+		}
+		
 		function updateValues()
 		{
 			document.getElementById("timestamp").innerHTML=(new Date()).toLocaleString();
+			GENERAL_STATUS	=	xDoc.getElementsByTagName('VAR')[0].childNodes[0].nodeValue;
+			error1=checkBit(GENERAL_STATUS,0);
+			error2=checkBit(GENERAL_STATUS,1);
+			error3=checkBit(GENERAL_STATUS,2);
 			var	str=xDoc.getElementsByTagName('AV')[0].childNodes[0].nodeValue;
 			vector=str.split(",");	
 			bin_number=(vector[0]<<24)	|	(vector[1]<<16)	|	(vector[2]<<8)	|	(vector[3]);
@@ -69,10 +127,12 @@
 			bin_number=(vector[0]<<24)	|	(vector[1]<<16)	|	(vector[2]<<8)	|	(vector[3]);
 			H3	=	Bytes2Float32(bin_number).toFixed(2);
 			document.getElementById("H3").innerHTML=H3;
+			
 		}
+		
     </script>
   </head>
-  <body	onload='setInterval(function(){send_request()},	10000);'>
+  <body	onload='plotLiveValues();send_request();setInterval(function(){send_request();},	10000);'>
     <div class="container-fluid">
 	  <div class="row" style="width:100%">
 		<div class="col-xs-4 col-md-4"><img src="img/logo.png" width="100" height="100"></div>
@@ -81,32 +141,37 @@
       <div class="tab-content">       
           <h2>Real-time Measurements</h2>
 		  <h3>Last data requested <span id="timestamp"></span></h3>
-          <table id="tab_mesures" data-toggle="table" data-show-colunns="true">
-            <thead>
-              <tr>
-				<th data-align="left" >Sensor</th>
-                <th data-align="left" >Temperature</th>
-                <th data-align="left" >Humidity</th>
-              </tr>
-            </thead>
-			<tbody>
-				<tr>
-					<td	width="25%">Sensor 1</td>
-					<td	width="25%"><span id="T1">25</span>&deg;C</td>
-					<td	width="25%"><span id="H1">25</span>&#37;</td>
-				</tr>
-				<tr>
-					<td	width="25%">Sensor 2</td>
-					<td	width="25%"><span id="T2">25</span>&deg;C</td>
-					<td	width="25%"><span id="H2">25</span>&#37;</td>
-				</tr>
-				<tr>
-					<td	width="25%">Sensor 3</td>
-					<td	width="25%"><span id="T3">25</span>&deg;C</td>
-					<td	width="25%"><span id="H3">25</span>&#37;</td>
-				</tr>
-			</tbody>
-          </table>
+		  <div class="table-responsive">
+			  <table id="tab_mesures" class="table">
+				<thead>
+				  <tr>
+					<th data-align="left" style="font-size:2vw;">Sensor</th>
+					<th data-align="left" style="font-size:2vw;">Temperature</th>
+					<th data-align="left" style="font-size:2vw;">Humidity</th>
+				  </tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td	width="25%" style="font-size:2vw;">Sensor 1</td>
+						<td	width="25%" style="font-size:2vw;"><span id="T1">25</span>&deg;C</td>
+						<td	width="25%" style="font-size:2vw;"><span id="H1">25</span>&#37;</td>
+					</tr>
+					<tr>
+						<td	width="25%" style="font-size:2vw;">Sensor 2</td>
+						<td	width="25%" style="font-size:2vw;"><span id="T2">25</span>&deg;C</td>
+						<td	width="25%" style="font-size:2vw;"><span id="H2">25</span>&#37;</td>
+					</tr>
+					<tr>
+						<td	width="25%" style="font-size:2vw;">Sensor 3</td>
+						<td	width="25%" style="font-size:2vw;"><span id="T3">25</span>&deg;C</td>
+						<td	width="25%" style="font-size:2vw;"><span id="H3">25</span>&#37;</td>
+					</tr>
+					<tr>
+						<td colspan="3" id="container"	width="100%"></td>
+					</tr>
+				</tbody>
+			  </table>
+		  </div>
       </div>
     </div>
   </body>
