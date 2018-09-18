@@ -1,3 +1,5 @@
+#include <ArduinoJson.h>
+
 #include <DHT.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
@@ -7,10 +9,16 @@
 #include <SPI.h>                         // Include the SPI library
 #include <FS.h>
 #include <ESP8266HTTPUpdateServer.h>
-#include "wifi_details.h"
-#define __TEST__
-#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
+
+#define __TEST__
+#define __DVT__ "3xDHT22"
+#define __FW_VERSION__ "1.0"
+#define __WEB_VERSION__ "1.0"
+#define __SAMPLE_TIME__   20000    // sample time in ms 
+
+#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
+#include "wifi_details.h"
 unsigned long timeNoPoll;
         
 // DHT Sensor
@@ -32,7 +40,7 @@ static byte STATUS_bits=0,Measure1OK=0,Measure2OK=0,Measure3OK=0;
 
 uint8_t IPaddr[4];
 uint8_t DeviceCode;
-const String DeviceType="3xDHT22"; 
+const String DeviceType=__DVT__; 
 float T1,T2,T3;
 float H1,H2,H3;
 float DewPoint_centdeg;
@@ -138,9 +146,9 @@ const byte _CONF_BTN_                    = 0;        // pin to initiate config p
 
 static bool configured_device=false;
 static unsigned long timeSample;
-const unsigned long _SAMPLETIME_        = 20000;    // sample time in ms 
 
-bool stopPolling=false,data_request=false;
+
+volatile bool stopPolling=false,data_request=false;
 
 void setup()
 {
@@ -261,6 +269,13 @@ void setup()
     server.on("/measure.xml", [](){
         data_request=true;
     });
+
+    server.on("/reset", [](){
+        server.send(200, "text/html", "");
+        delay(200);
+        remove_setupJSON();
+        ESP.reset();
+    });
     
     server.on("/data.xml", [](){
         byte var[25];  
@@ -333,24 +348,60 @@ void setup()
     {
       // Serious problem
       Serial.println("SPIFFS Mount failed");
+      //ESP.reset();
     } else {
       Serial.println("SPIFFS Mount succesfull");
     }
-  
+    if (!SPIFFS.exists("/setup.json"))
+    {
+      create_setupJSON();
+    }
+    
     server.serveStatic("/img", SPIFFS, "/img");
     server.serveStatic("/", SPIFFS, "/index.html");
+    server.serveStatic("/setup.json", SPIFFS, "/setup.json");
   
 
     // Start the server
-    const char * path = "/firmwareupdate";
+    const char * updatepath = "/firmwareupdate";
     const char * username = "diy4dot0";
     const char * password = "diy4dot0";
-    httpUpdater.setup(&server,path,username,password);
+    httpUpdater.setup(&server,updatepath,username,password);
     server.begin();
     Serial.println("Server started");
     
     
     timeSample=millis();
+}
+
+void remove_setupJSON()
+{
+  if (!SPIFFS.exists("/setup.json"))
+    {
+      SPIFFS.remove("/setup.json");
+      Serial.println("setup.json removed OK");
+    }
+}
+
+void create_setupJSON()
+{
+      File setupFile = SPIFFS.open("/setup.json", "w");
+      const size_t bufferSize = JSON_ARRAY_SIZE(3) + JSON_OBJECT_SIZE(5);
+      DynamicJsonBuffer jsonBuffer(bufferSize);
+      
+      JsonObject& root = jsonBuffer.createObject();
+      root["DVT"] = __DVT__;
+      root["fw_version"] = __FW_VERSION__;
+      root["web_version"] = __WEB_VERSION__;
+      root["sample"] = __SAMPLE_TIME__;
+      
+      JsonArray& sensor_pins = root.createNestedArray("sensor_pins");
+      sensor_pins.add("D5");
+      sensor_pins.add("D6");
+      sensor_pins.add("D7");
+      root.printTo(setupFile); // Export and save JSON object to SPIFFS area
+      setupFile.close();  
+      Serial.println("setup.json created OK");  
 }
 
 void loop()
@@ -416,7 +467,7 @@ void loop()
         server.send(200, "text/xml", response);  
     }
     
-    if (configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_) && !stopPolling)
+    if (configured_device && (abs(millis()-timeSample)>=__SAMPLE_TIME__) && !stopPolling)
     {
         unsigned long time1,time2;
         time1=millis();
@@ -477,7 +528,7 @@ void loop()
         timeSample=millis();
     }
 
-    if (!configured_device && (abs(millis()-timeSample)>=_SAMPLETIME_) && !stopPolling)
+    if (!configured_device && (abs(millis()-timeSample)>=__SAMPLE_TIME__) && !stopPolling)
     {
         unsigned long time1,time2;
         time1=millis();
@@ -545,7 +596,7 @@ void loop()
         timeSample=millis();
     }
 
-    if (stopPolling&&(millis()-timeNoPoll>=_SAMPLETIME_)){stopPolling=false;Serial.println("Automatic polling restored");}
+    if (stopPolling&&(millis()-timeNoPoll>=__SAMPLE_TIME__)){stopPolling=false;Serial.println("Automatic polling restored");}
     server.handleClient();
 }
 
