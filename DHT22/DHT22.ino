@@ -32,8 +32,20 @@ DHT dht3(DHTPin3, DHTTYPE);
 static float t1_mean=0,h1_mean=0,t2_mean=0,h2_mean=0,t3_mean=0,h3_mean=0;
 static int t1_number=0,h1_number=0,t2_number=0,h2_number=0,t3_number=0,h3_number=0;
 static byte STATUS_bits=0,Measure1OK=0,Measure2OK=0,Measure3OK=0;
+// STATUS BITS
+const byte _ErrorSensor1_=0;
+const byte _ErrorSensor2_=1;
+const byte _ErrorSensor3_=2;
+const byte _Relay1_=3;
+const byte _Relay2_=4;
+const byte _Relay3_=5;
 
-
+// Relays
+const int Relay1Pin = D1; 
+const int Relay2Pin = D2;
+const int Relay3Pin = D3;
+#define __RELAY_ON__ 0
+#define __RELAY_OFF__ 1
 
 // MAC address from Ethernet shield sticker under board
 //byte mac[] = { 0xDE, 0xAD, 0xBE, 0x41, 0x42, 0x21 }; // make sure you change these values so that no MAC collision exist in your network
@@ -132,6 +144,25 @@ struct XML_RESPONSES_data
 const char *pXML_RESP_data = &xml_response_data._XML_HEADER_[0];
 const int __SIZE_XML_RESPONSE_data__ = sizeof(xml_response_data);
 
+struct XML_RESPONSES_status
+{
+  const char _XML_HEADER_[25];
+  const char _XML_TAG_[3];
+  const char _XML_DEV_TAG_[5];
+  const char _XML_DEV_[1];
+  const char _cXML_DEV_TAG_[6];
+  struct XML_TAGS_BYTE BYTE_DATA_TAGS[1];
+  const char _cXML_TAG_[5];
+}xml_response_status = {
+                 {'<','?','x','m','l',' ','v','e','r','s','i','o','n',' ','=',' ','"','1','.','0','"',' ','?','>','\n'},
+                 {'<','X','>'},
+                 {'<','D','E','V','>'},{'#'},{'<','/','D','E','V','>'},
+                 {var_tag},
+                 {'<','/','X','>','\n'}  
+                };
+
+const char *pXML_RESP_status = &xml_response_status._XML_HEADER_[0];
+const int __SIZE_XML_RESPONSE_status__ = sizeof(xml_response_status);
 
 // EEPROM structure
 const uint8_t _EEPROMaddrDEVICECODE_      = 0;     // address for the deviceCode in EEPROM
@@ -152,8 +183,14 @@ volatile bool stopPolling=false,data_request=false;
 
 void setup()
 {
-    Serial.begin(115200);
-    
+    Serial.begin(9600);
+    // INITIALIZE RELAYS
+    pinMode(Relay1Pin, OUTPUT);           // set pin to output
+    digitalWrite(Relay1Pin, __RELAY_OFF__);       // turn off relay
+    pinMode(Relay2Pin, OUTPUT);           // set pin to output
+    digitalWrite(Relay2Pin, __RELAY_OFF__);       // turn off relay
+    pinMode(Relay3Pin, OUTPUT);           // set pin to output
+    digitalWrite(Relay3Pin, __RELAY_OFF__);       // turn off relay
     // TO FORCE CERTAIN IP ADDRESS
     #ifdef __TEST__
       EEPROM.begin(512);
@@ -258,7 +295,52 @@ void setup()
         Serial.print("Statics resetted");
         initialize_statics();
     });
-  
+
+    server.on("/orders/setrelay.htm", [](){
+        int relay,value,valueOUT;
+        if (server.arg("REL")!= "" && server.arg("VAL")!= "")  
+        {
+          relay = server.arg("REL").toInt();              //Get the value of the parameter
+          value = server.arg("VAL").toInt();              //Get the value of the parameter
+          Serial.print("Relay to be set ");
+          Serial.print(relay);
+          Serial.print(". To the value ");
+          Serial.println(value);
+          if (value){valueOUT=__RELAY_ON__;}
+          else{valueOUT=__RELAY_OFF__;}
+          switch (relay)
+          { case 1:
+                  digitalWrite(Relay1Pin, valueOUT);       // turn on relay
+                  if (value){STATUS_bits|=1<<_Relay1_;
+                  }else{STATUS_bits&=~(1<<_Relay1_);}
+                  break;
+            case 2: 
+                  digitalWrite(Relay2Pin, valueOUT);       // turn on relay
+                  if (value){STATUS_bits|=1<<_Relay2_;
+                  }else{STATUS_bits&=~(1<<_Relay2_);}
+                  break;
+            case 3:
+                  digitalWrite(Relay3Pin, valueOUT);       // turn on relay
+                  if (value){STATUS_bits|=1<<_Relay3_;
+                  }else{STATUS_bits&=~(1<<_Relay3_);}
+                  break;
+            default:
+                  Serial.print("Relay to be set ");
+                  Serial.println(relay);
+                  server.send(404, "text/html", "Relay number incorrect");
+                  delay(200);
+                  return;
+          }
+        }else
+        {
+          server.send(404, "text/html", "The parameter REL for the relay number and/or the VAL for the value were not found in the url");
+          delay(200);
+          return;
+        }
+        String response = XML_response(&STATUS_bits,__SIZE_XML_RESPONSE_status__,pXML_RESP_status); // sends the status of all switches
+        server.send(200, "text/html", response);
+        delay(200);
+    });
     server.on("/Conf.xml", [](){
         String response = XML_response(&DeviceCode,__SIZE_XML_RESPONSE_Conf__,pXML_RESP_Conf); // sends the status of all switches
         //Serial.print(response);
@@ -292,7 +374,7 @@ void setup()
             *((byte*)&t1+3-i)=0xFF;
             *((byte*)&h1+3-i)=0xFF;
           }
-          STATUS_bits|=1<<0;
+          STATUS_bits|=1<<_ErrorSensor1_;
         }
         if (Measure2OK==1)
         {
@@ -305,7 +387,7 @@ void setup()
             *((byte*)&t2+3-i)=0xFF;
             *((byte*)&h2+3-i)=0xFF;
           }
-          STATUS_bits|=1<<1;
+          STATUS_bits|=1<<_ErrorSensor2_;
         }
         if (Measure3OK==1)
         {
@@ -318,7 +400,7 @@ void setup()
             *((byte*)&t3+3-i)=0xFF;
             *((byte*)&h3+3-i)=0xFF;
           }
-          STATUS_bits|=1<<2;
+          STATUS_bits|=1<<_ErrorSensor3_;
         }
         
         var[0]=STATUS_bits;
@@ -422,8 +504,8 @@ void loop()
             *((byte*)&t1+3-i)=0xFF;
             *((byte*)&h1+3-i)=0xFF;
           }
-          STATUS_bits|=1<<0;
-        }else{STATUS_bits&=~(1<<0);}
+          STATUS_bits|=1<<_ErrorSensor1_;
+        }else{STATUS_bits&=~(1<<_ErrorSensor1_);}
         float h2 = dht2.readHumidity();
         float t2 = dht2.readTemperature();
         delay(100);
@@ -433,8 +515,8 @@ void loop()
             *((byte*)&t2+3-i)=0xFF;
             *((byte*)&h2+3-i)=0xFF;
           }
-          STATUS_bits|=1<<1;
-        }else{STATUS_bits&=~(1<<1);}
+          STATUS_bits|=1<<_ErrorSensor2_;
+        }else{STATUS_bits&=~(1<<_ErrorSensor2_);}
         float h3 = dht3.readHumidity();
         float t3 = dht3.readTemperature();
         delay(100);
@@ -444,8 +526,8 @@ void loop()
             *((byte*)&t3+3-i)=0xFF;
             *((byte*)&h3+3-i)=0xFF;
           }
-          STATUS_bits|=1<<2;
-        }else{STATUS_bits&=~(1<<2);}
+          STATUS_bits|=1<<_ErrorSensor3_;
+        }else{STATUS_bits&=~(1<<_ErrorSensor3_);}
         var[0]=STATUS_bits;
         for (byte i=0;i<4;i++)
         {

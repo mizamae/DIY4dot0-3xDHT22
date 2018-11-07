@@ -12,7 +12,7 @@
 	<script>    
 		var xDoc, parser	=	new	DOMParser(), request	=	new	XMLHttpRequest();
 		var typeREQ="measure.xml";
-		var T1,T2,T3,error1=0,error2=0,error3=0;
+		var T1,T2,T3,error1=0,error2=0,error3=0,relay1=0,relay2=0,relay3=0;
 		
 		function	checkBit(number,n)
 		{	var	mask	=	1	<<	n;	
@@ -94,6 +94,33 @@
 			error1=checkBit(GENERAL_STATUS,0);
 			error2=checkBit(GENERAL_STATUS,1);
 			error3=checkBit(GENERAL_STATUS,2);
+            relay1=checkBit(GENERAL_STATUS,3);
+            if (relay1)
+            {
+                document.getElementById("R1ON").style.backgroundColor = "Red";
+                document.getElementById("R1OFF").style.backgroundColor = "DarkGray";
+            }else{
+                document.getElementById("R1ON").style.backgroundColor = "DarkGray";
+                document.getElementById("R1OFF").style.backgroundColor = "Red";
+            }
+			relay2=checkBit(GENERAL_STATUS,4);
+            if (relay2)
+            {
+                document.getElementById("R2ON").style.backgroundColor = "Red";
+                document.getElementById("R2OFF").style.backgroundColor = "DarkGray";
+            }else{
+                document.getElementById("R2ON").style.backgroundColor = "DarkGray";
+                document.getElementById("R2OFF").style.backgroundColor = "Red";
+            }
+			relay3=checkBit(GENERAL_STATUS,5);
+            if (relay3)
+            {
+                document.getElementById("R3ON").style.backgroundColor = "Red";
+                document.getElementById("R3OFF").style.backgroundColor = "DarkGray";
+            }else{
+                document.getElementById("R3ON").style.backgroundColor = "DarkGray";
+                document.getElementById("R3OFF").style.backgroundColor = "Red";
+            }
 			var	str=xDoc.getElementsByTagName('AV')[0].childNodes[0].nodeValue;
 			vector=str.split(",");	
 			bin_number=(vector[0]<<24)	|	(vector[1]<<16)	|	(vector[2]<<8)	|	(vector[3]);
@@ -130,6 +157,20 @@
 			
 		}
 		
+        function	SetRelay(strARGS)
+		{	
+            var xmlhttp	=	new	XMLHttpRequest();
+            xmlhttp.open('GET',	'/orders/setrelay.htm?'+strARGS,true);
+            xmlhttp.send(null);
+            
+            xmlhttp.onreadystatechange	=	function()
+            {	if	((this.readyState	==	4)	&&	(this.status	==	200)){
+                        xDoc	=	parser.parseFromString(this.responseText,	"application/xml");
+                        updateValues();
+                }
+            }
+        
+        }
     </script>
   </head>
   <body	onload='plotLiveValues();send_request();setInterval(function(){send_request();},	10000);'>
@@ -138,7 +179,35 @@
 		<div class="col-xs-4 col-md-4"><img src="img/logo.png" width="100" height="100"></div>
 		<div class="col-xs-4 col-md-4"><h1>3xDHT22</h1></div>
 	  </div>
-      <div class="tab-content">       
+      <div class="tab-content">
+          <div class="table-responsive">
+            <table id="tab_relays" class="table">
+				<thead>
+				  <tr>
+					<th data-align="left" style="font-size:2vw;">Relay</th>
+					<th data-align="left" style="font-size:2vw;">Activate</th>
+					<th data-align="left" style="font-size:2vw;">Deactivate</th>
+				  </tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td	width="25%" style="font-size:2vw;">Relay 1</td>
+						<td	width="25%" style="font-size:2vw;"><div	class="btn btn-primary"	id="R1ON"	onclick="SetRelay('REL=1&VAL=1')"/>ON</div></td>
+						<td	width="25%" style="font-size:2vw;"><div	class="btn btn-primary"	id="R1OFF"	onclick="SetRelay('REL=1&VAL=0')"/>OFF</div></td>
+					</tr>
+                    <tr>
+						<td	width="25%" style="font-size:2vw;">Relay 2</td>
+						<td	width="25%" style="font-size:2vw;"><div	class="btn btn-primary"	id="R2ON"	onclick="SetRelay('REL=2&VAL=1')"/>ON</div></td>
+						<td	width="25%" style="font-size:2vw;"><div	class="btn btn-primary"	id="R2OFF"	onclick="SetRelay('REL=2&VAL=0')"/>OFF</div></td>
+					</tr>
+                    <tr>
+						<td	width="25%" style="font-size:2vw;">Relay 3</td>
+						<td	width="25%" style="font-size:2vw;"><div	class="btn btn-primary"	id="R3ON"	onclick="SetRelay('REL=3&VAL=1')"/>ON</div></td>
+						<td	width="25%" style="font-size:2vw;"><div	class="btn btn-primary"	id="R3OFF"	onclick="SetRelay('REL=3&VAL=0')"/>OFF</div></td>
+					</tr>
+                </tbody>
+            </table>
+          </div>
           <h2>Real-time Measurements</h2>
 		  <h3>Last data requested <span id="timestamp"></span></h3>
 		  <div class="table-responsive">
