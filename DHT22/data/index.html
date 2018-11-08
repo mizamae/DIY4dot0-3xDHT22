@@ -58,6 +58,9 @@
 										graph.series[3].addPoint([x,	parseFloat(error1)],	true,	true);
 										graph.series[4].addPoint([x,	parseFloat(error2)],	true,	true);
 										graph.series[5].addPoint([x,	parseFloat(error3)],	true,	true);
+                                        graph.series[6].addPoint([x,	parseFloat(relay1)],	true,	true);
+                                        graph.series[7].addPoint([x,	parseFloat(relay2)],	true,	true);
+                                        graph.series[8].addPoint([x,	parseFloat(relay3)],	true,	true);
 										},	10000);}}},
 						title:	{text:	'Real-time variables'},
 						xAxis:	{type:	'datetime',tickPixelInterval:	150},
@@ -81,6 +84,15 @@
 																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:0});}
 																		return	data;}()),step: 'right'},
 								{name:	'Error3',type: 'line',yAxis: 1,data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
+																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:0});}
+																		return	data;}()),step: 'right'},
+                                {name:	'Relay1',type: 'line',yAxis: 1,data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
+																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:0});}
+																		return	data;}()),step: 'right'},
+                                {name:	'Relay2',type: 'line',yAxis: 1,data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
+																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:0});}
+																		return	data;}()),step: 'right'},
+                                {name:	'Relay3',type: 'line',yAxis: 1,data:	(function	()	{var	data	=	[],time	=	(new	Date()).getTime(),i;
 																		for	(i	=	-10;	i	<=	0;	i	+=	1)	{data.push({x:	time	+	i	*	1000,y:0});}
 																		return	data;}()),step: 'right'},
 								]});

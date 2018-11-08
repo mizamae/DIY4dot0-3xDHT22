@@ -311,18 +311,12 @@ void setup()
           switch (relay)
           { case 1:
                   digitalWrite(Relay1Pin, valueOUT);       // turn on relay
-                  if (value){STATUS_bits|=1<<_Relay1_;
-                  }else{STATUS_bits&=~(1<<_Relay1_);}
                   break;
             case 2: 
                   digitalWrite(Relay2Pin, valueOUT);       // turn on relay
-                  if (value){STATUS_bits|=1<<_Relay2_;
-                  }else{STATUS_bits&=~(1<<_Relay2_);}
                   break;
             case 3:
                   digitalWrite(Relay3Pin, valueOUT);       // turn on relay
-                  if (value){STATUS_bits|=1<<_Relay3_;
-                  }else{STATUS_bits&=~(1<<_Relay3_);}
                   break;
             default:
                   Serial.print("Relay to be set ");
@@ -337,6 +331,7 @@ void setup()
           delay(200);
           return;
         }
+        checkRelays();
         String response = XML_response(&STATUS_bits,__SIZE_XML_RESPONSE_status__,pXML_RESP_status); // sends the status of all switches
         server.send(200, "text/html", response);
         delay(200);
@@ -402,7 +397,9 @@ void setup()
           }
           STATUS_bits|=1<<_ErrorSensor3_;
         }
-        
+
+        checkRelays();
+                  
         var[0]=STATUS_bits;
         for (byte i=0;i<4;i++)
         {
@@ -455,6 +452,17 @@ void setup()
     
     timeSample=millis();
 }
+
+void checkRelays()
+{
+  if (digitalRead(Relay1Pin)==__RELAY_ON__){STATUS_bits|=1<<_Relay1_;
+  }else{STATUS_bits&=~(1<<_Relay1_);}
+  if (digitalRead(Relay2Pin)==__RELAY_ON__){STATUS_bits|=1<<_Relay2_;
+  }else{STATUS_bits&=~(1<<_Relay2_);}
+  if (digitalRead(Relay3Pin)==__RELAY_ON__){STATUS_bits|=1<<_Relay3_;
+  }else{STATUS_bits&=~(1<<_Relay3_);}
+}
+
 
 void remove_setupJSON()
 {
@@ -528,6 +536,9 @@ void loop()
           }
           STATUS_bits|=1<<_ErrorSensor3_;
         }else{STATUS_bits&=~(1<<_ErrorSensor3_);}
+
+        checkRelays();
+        
         var[0]=STATUS_bits;
         for (byte i=0;i<4;i++)
         {
