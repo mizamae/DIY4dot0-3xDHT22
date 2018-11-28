@@ -47,9 +47,6 @@ const int Relay3Pin = D3;
 #define __RELAY_ON__ 0
 #define __RELAY_OFF__ 1
 
-// MAC address from Ethernet shield sticker under board
-//byte mac[] = { 0xDE, 0xAD, 0xBE, 0x41, 0x42, 0x21 }; // make sure you change these values so that no MAC collision exist in your network
-
 uint8_t IPaddr[4];
 uint8_t DeviceCode;
 const String DeviceType=__DVT__; 
@@ -466,7 +463,7 @@ void checkRelays()
 
 void remove_setupJSON()
 {
-  if (!SPIFFS.exists("/setup.json"))
+  if (SPIFFS.exists("/setup.json"))
     {
       SPIFFS.remove("/setup.json");
       Serial.println("setup.json removed OK");
