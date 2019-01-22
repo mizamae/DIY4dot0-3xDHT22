@@ -1,3 +1,27 @@
+/* 
+ *  DEVICE:    LOLIN WEMOS D1R2 & mini
+ *  ORDERS:
+ *      /orders/reset
+ *          Order to soft-reset the device
+ *      /orders/SetConf
+ *          Order to set the device code.
+ *          Params: DEVC <int> to set the device code
+*       /orders/resetStatics
+*           Order to reset the static variables after a request
+*       /orders/setrelay
+*           Order to set the status of a relay
+*           Params: REL <int> the relay number to be set (1,2,3)
+*                   VAL <int> the value to be set (1=ON, 0=OFF)
+*   REQUESTS:
+*       /Conf.xml
+*           Request to retrieve the current configuration of the device
+*       /measure.xml
+*           Request to get instantaneous values of the sensors
+*       /data.xml
+*           Request to get the aggregated values of the sensors
+*           
+      
+*/
 #include <ArduinoJson.h>
 
 #include <DHT.h>
@@ -11,7 +35,7 @@
 #include <ESP8266HTTPUpdateServer.h>
 
 
-#define __TEST__
+//#define __TEST__
 #define __DVT__ "3xDHT22"
 #define __FW_VERSION__ "1.0"
 #define __WEB_VERSION__ "1.0"
@@ -193,9 +217,9 @@ void setup()
       EEPROM.begin(512);
       DeviceCode=254;
       EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
-      EEPROM.write(_EEPROMaddrIP_B1_,10);
-      EEPROM.write(_EEPROMaddrIP_B2_,10);
-      EEPROM.write(_EEPROMaddrIP_B3_,10);
+      EEPROM.write(_EEPROMaddrIP_B1_,IP[1]);
+      EEPROM.write(_EEPROMaddrIP_B2_,IP[2]);
+      EEPROM.write(_EEPROMaddrIP_B3_,IP[3]);
       EEPROM.write(_EEPROMaddrDEVICECODE_,DeviceCode);
       EEPROM.end();
     #endif
@@ -207,11 +231,12 @@ void setup()
     
     if ((DeviceCode==255)||(DeviceCode==254)||!digitalRead(_CONF_BTN_)) // the device has not been configured. This is so in Arduino devices where EEPROM defaults to 255. In ESP8266 flash is randomly defaulted!!!
     {
-        DeviceCode=254;
-        IPaddr[0]=254;
-        IPaddr[1]=0;
-        IPaddr[2]=168;
-        IPaddr[3]=192;
+        DeviceCode=IP[0];      
+        IPaddr[0]=IP[0];
+        IPaddr[1]=IP[1];
+        IPaddr[2]=IP[2];
+        IPaddr[3]=IP[3];
+
         Serial.println("Unconfigured device");
         configured_device=false;
     }else
@@ -265,14 +290,14 @@ void setup()
     dht2.begin();
     dht3.begin();
     
-    server.on("/orders/SetConf.htm", [](){
+    server.on("/orders/SetConf", [](){
         if (server.arg("DEVC")!= "")  
         {
           DeviceCode = server.arg("DEVC").toInt();              //Get the value of the parameter
           EEPROM.write(_EEPROMaddrIP_B0_,DeviceCode);
-          EEPROM.write(_EEPROMaddrIP_B1_,10);
-          EEPROM.write(_EEPROMaddrIP_B2_,10);
-          EEPROM.write(_EEPROMaddrIP_B3_,10);
+          EEPROM.write(_EEPROMaddrIP_B1_,IP[1]);
+          EEPROM.write(_EEPROMaddrIP_B2_,IP[2]);
+          EEPROM.write(_EEPROMaddrIP_B3_,IP[3]);
           EEPROM.write(_EEPROMaddrDEVICECODE_,DeviceCode);
           EEPROM.end();
           Serial.print("DeviceCode to be set at ");
@@ -293,7 +318,7 @@ void setup()
         initialize_statics();
     });
 
-    server.on("/orders/setrelay.htm", [](){
+    server.on("/orders/setrelay", [](){
         int relay,value,valueOUT;
         if (server.arg("REL")!= "" && server.arg("VAL")!= "")  
         {
@@ -344,10 +369,10 @@ void setup()
         data_request=true;
     });
 
-    server.on("/reset", [](){
+    server.on("/orders/reset", [](){
         server.send(200, "text/html", "");
         delay(200);
-        remove_setupJSON();
+        //remove_setupJSON();
         ESP.reset();
     });
     
