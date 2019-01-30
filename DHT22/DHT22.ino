@@ -194,7 +194,7 @@ const uint8_t _EEPROMaddrIP_B3_           = 4;     // address for the MSB of IP 
 
 
 // CONFIG BUTON
-const byte _CONF_BTN_                    = 0;        // pin to initiate config procedure
+const byte _CONF_BTN_                    = D6;        // pin to initiate config procedure
 
 static bool configured_device=false;
 static unsigned long timeSample;
